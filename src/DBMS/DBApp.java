@@ -93,62 +93,62 @@ public class DBApp {
     
     
     public static void recoverRecords(String tableName, ArrayList<String[]> missing) {
-        if (missing == null || missing.isEmpty()) {
-            return;
-        }
-
         Table t = FileManager.loadTable(tableName);
         if (t == null) {
             return;
         }
 
-        // Group records by their original page numbers
-        HashMap<Integer, ArrayList<String[]>> pageRecordsMap = new HashMap<>();
         ArrayList<Integer> recoveredPages = new ArrayList<>();
+        int missingCount = (missing == null) ? 0 : missing.size();
 
-        // Get all records to determine original positions
-        ArrayList<String[]> allRecords = t.select();
+        if (missing != null && !missing.isEmpty()) {
+            // Group records by their original page numbers
+            HashMap<Integer, ArrayList<String[]>> pageRecordsMap = new HashMap<>();
 
-        // Create a map of record to its original position
-        HashMap<String, Integer> recordPositions = new HashMap<>();
-        for (int i = 0; i < allRecords.size(); i++) {
-            recordPositions.put(Arrays.toString(allRecords.get(i)), i);
-        }
+            // Get all records to determine original positions
+            ArrayList<String[]> allRecords = t.select();
 
-        // Group missing records by their original page numbers
-        for (String[] record : missing) {
-            Integer pos = recordPositions.get(Arrays.toString(record));
-            if (pos != null) {
-                int pageNum = pos / dataPageSize;
-                if (!pageRecordsMap.containsKey(pageNum)) {
-                    pageRecordsMap.put(pageNum, new ArrayList<>());
-                    recoveredPages.add(pageNum);
+            // Create a map of record to its original position
+            HashMap<String, Integer> recordPositions = new HashMap<>();
+            for (int i = 0; i < allRecords.size(); i++) {
+                recordPositions.put(Arrays.toString(allRecords.get(i)), i);
+            }
+
+            // Group missing records by their original page numbers
+            for (String[] record : missing) {
+                Integer pos = recordPositions.get(Arrays.toString(record));
+                if (pos != null) {
+                    int pageNum = pos / dataPageSize;
+                    if (!pageRecordsMap.containsKey(pageNum)) {
+                        pageRecordsMap.put(pageNum, new ArrayList<>());
+                        recoveredPages.add(pageNum);
+                    }
+                    pageRecordsMap.get(pageNum).add(record);
                 }
-                pageRecordsMap.get(pageNum).add(record);
+            }
+
+            // Sort recovered pages to maintain order
+            Collections.sort(recoveredPages);
+
+            // Recover each page
+            for (Integer pageNum : recoveredPages) {
+                Page p = new Page();
+                // Get all records that should be on this page
+                int startIdx = pageNum * dataPageSize;
+                int endIdx = Math.min(startIdx + dataPageSize, allRecords.size());
+
+                // Add records in their original order
+                for (int i = startIdx; i < endIdx; i++) {
+                    String[] record = allRecords.get(i);
+                    p.insert(record);
+                }
+
+                FileManager.storeTablePage(tableName, pageNum, p);
             }
         }
 
-        // Sort recovered pages to maintain order
-        Collections.sort(recoveredPages);
-
-        // Recover each page
-        for (Integer pageNum : recoveredPages) {
-            Page p = new Page();
-            // Get all records that should be on this page
-            int startIdx = pageNum * dataPageSize;
-            int endIdx = Math.min(startIdx + dataPageSize, allRecords.size());
-
-            // Add records in their original order
-            for (int i = startIdx; i < endIdx; i++) {
-                String[] record = allRecords.get(i);
-                p.insert(record);
-            }
-
-            FileManager.storeTablePage(tableName, pageNum, p);
-        }
-
-        // Update trace with exact format expected by tests
-        String traceMsg = "Recovering " + missing.size() + " records in pages: " + recoveredPages + ".";
+        // Always add a trace, even if nothing was recovered
+        String traceMsg = "Recovering " + missingCount + " records in pages: " + recoveredPages;
         t.trace.add(traceMsg);
         FileManager.storeTable(tableName, t);
     }

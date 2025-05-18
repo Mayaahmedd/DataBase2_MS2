@@ -153,6 +153,8 @@ public class Table implements Serializable {
 		return this.trace.get(this.trace.size() - 1);
 	}
 
-
+	public void invalidateCache() {
+		allRecordsCache = null;
+	}
 
 }
