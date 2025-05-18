@@ -139,7 +139,9 @@ public class Table implements Serializable {
 		long startTime = System.currentTimeMillis();
 		for (int i = 0; i < pageCount; i++) {
 			Page p = FileManager.loadTablePage(this.name, i);
-			res.addAll(p.select());
+			if (p != null) {  // Only process non-null pages
+				res.addAll(p.select());
+			}
 		}
 		long stopTime = System.currentTimeMillis();
 		this.trace.add("Select all pages:" + pageCount + ", records:" + recordsCount
